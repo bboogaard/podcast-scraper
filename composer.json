@@ -1,0 +1,7 @@
+{
+    "require": {
+        "phpunit/phpunit": "^7.2",
+        "mockery/mockery": "^1.2",
+        "mibe/feedwriter": "^1.1"
+    }
+}
