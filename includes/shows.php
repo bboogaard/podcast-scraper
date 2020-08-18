@@ -92,7 +92,7 @@ class Show {
         return $this->wpdb->get_results(
             $this->wpdb->prepare(
                 "SELECT * FROM " . $this->episodes_table . " " .
-                "WHERE show_id = %s",
+                "WHERE show_id = %s ORDER BY episode_date DESC",
                 $show_id
             )
         );

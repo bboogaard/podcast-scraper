@@ -15,9 +15,7 @@
 // Your code starts here.
 define('PODCAST_SCRAPER_PATH', __FILE__);
 
-if (file_exists('vendor/autoload.php')) {
-    require('vendor/autoload.php');
-}
+require('vendor/autoload.php');
 
 if (!class_exists('DOMEvent')) {
     require('ext/phpQuery.php');
@@ -31,7 +29,6 @@ require('includes/lib/http.php');
 require('includes/scrapers/base.php');
 require('includes/scrapers/podcastluisteren.php');
 require('includes/shows.php');
-require('includes/shows.feed.php');
 require('includes/shows.manage.php');
 require('includes/shows.table.php');
 
@@ -45,6 +42,8 @@ function podcast_scraper_activate() {
 register_activation_hook( __FILE__, 'podcast_scraper_activate' );
 
 function podcast_scraper_run() {
+
+    require_once('includes/shows.feed.php');
 
     PodcastScraper\ShowManagerFactory::register();
     PodcastScraper\ShowFeed::register();
