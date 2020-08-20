@@ -2,18 +2,21 @@
 
 namespace PodcastScraper;
 
+use PodcastScraper\Lib\Cache;
 use \WP_Error;
 use WP\WP_Remote;
 
 class Show {
 
-    private $episodes_table, $shows_table, $wp_remote, $wpdb;
+    private $cache, $episodes_table, $shows_table, $wp_remote, $wpdb;
 
     public function __construct(WP_Remote $wp_remote) {
 
         global $wpdb;
 
         $this->wp_remote = $wp_remote;
+
+        $this->cache = new Cache('podcast-scraper-');
 
         $this->wpdb = $wpdb;
         $this->shows_table = $this->wpdb->prefix . "podcast_scraper_shows";
@@ -77,11 +80,20 @@ class Show {
 
     public function delete_show($id) {
 
-        return $this->wpdb->query(
+        $show = $this->get_show($id);
+
+        $this->wpdb->query(
             $this->wpdb->prepare(
                 "DELETE FROM " . $this->shows_table . " " .
                 "WHERE id = %d",
                 $id
+            )
+        );
+        $this->wpdb->query(
+            $this->wpdb->prepare(
+                "DELETE FROM " . $this->episodes_table . " " .
+                "WHERE show_id = %s",
+                $show->show_id
             )
         );
 
@@ -99,33 +111,48 @@ class Show {
 
     }
 
-    public function sync_show($id, $force=false) {
+    public function sync_show($show_id) {
 
-        set_time_limit(0);
-
-        $show = $this->get_show($id);
+        $show = $this->get_show_by_show_id($show_id);
         if (!$show) {
-            return new WP_Error( 'no_such_podcast', __('Podcast not found', 'podcast-scraper'), array( 'status' => 404 ) );
-        }
-
-        $current_time = time();
-        if ($current_time - $show->update_time <= 86400 && !$force) {
-            return array();
+            return false;
         }
 
         $scraper_class = podcast_scraper_get_scraper_class($show->scraper_handle);
         if (!$scraper_class) {
-            return new WP_Error('no_scraper', __('No scraper found for podcast', 'podcast-scraper'), array( 'status' => 400 ));
+            return false;
         }
 
         $scraper = new $scraper_class($this->wp_remote);
-        $result = $scraper->scrape($show->show_id, $show->max_episodes);
-        if (!$result['show']['show_title']) {
-            return new WP_Error('no_show_title', __('No show title found', 'podcast-scraper'), array( 'status' => 409 ));
+        $episodes = $scraper->get_episodes($show->show_id, $show->max_episodes);
+
+        $new_episodes = array();
+        foreach ($episodes as $episode) {
+            array_push($new_episodes, $episode['episode_id']);
         }
 
+        $db_episodes = $this->get_episodes($show->show_id);
+        $existing_episodes = array();
+        foreach ($db_episodes as $episode) {
+            array_push($existing_episodes, $episode->episode_id);
+        }
+
+        sort($new_episodes);
+        sort($existing_episodes);
+        $diff = array_diff($new_episodes, $existing_episodes);
+        if (empty($diff)) {
+            return $show->update_time;
+        }
+
+        $result = $scraper->scrape($show->show_id, $show->max_episodes);
+        if (!$result['show']['show_title']) {
+            return false;
+        }
+
+        $current_time = time();
+
         $this->update_show(
-            $id,
+            $show->id,
             array(
                 'show_title' => $result['show']['show_title'],
                 'show_description' => $result['show']['show_description'],
@@ -134,41 +161,53 @@ class Show {
             )
         );
 
-        $rows = array();
-        $this->wpdb->query(
-            $this->wpdb->prepare(
-                "DELETE FROM " . $this->episodes_table . " " .
-                "WHERE show_id = %s",
-                $show->show_id
-            )
-        );
+        $insert_rows = array();
         foreach ($result['episodes'] as $episode) {
             if (!$episode['episode_id'] || !$episode['episode_title'] ||
                     !$episode['episode_file'] || !$episode['episode_date']) {
-                return new WP_Error('incomplete_episode', __('Incomplete episode', 'podcast-scraper'), array( 'status' => 409 ));
+                return false;
             }
-            array_push(
-                $rows,
-                array(
-                    'show_id' => $show->show_id,
-                    'episode_id' => $episode['episode_id'],
-                    'episode_title' => $episode['episode_title'],
-                    'episode_description' => $episode['episode_description'],
-                    'episode_image' => $episode['episode_image'],
-                    'episode_file' => $episode['episode_file'],
-                    'episode_file_size' => $episode['episode_file_size'],
-                    'episode_file_type' => $episode['episode_file_type'],
-                    'episode_date' => $episode['episode_date']
+            if (!in_array($episode['episode_id'], $existing_episodes)) {
+                array_push(
+                    $insert_rows,
+                    array(
+                        'show_id' => $show->show_id,
+                        'episode_id' => $episode['episode_id'],
+                        'episode_title' => $episode['episode_title'],
+                        'episode_description' => $episode['episode_description'],
+                        'episode_image' => $episode['episode_image'],
+                        'episode_file' => $episode['episode_file'],
+                        'episode_file_size' => $episode['episode_file_size'],
+                        'episode_file_type' => $episode['episode_file_type'],
+                        'episode_date' => $episode['episode_date']
+                    )
+                );
+            }
+        }
+        podcast_scraper_wpdb_bulk_insert($this->episodes_table, $insert_rows);
+
+        $diff = array_diff($existing_episodes, $new_episodes);
+        if (!empty($diff)) {
+            $this->wpdb->query(
+                podcast_scraper_wpdb_in_format(
+                    "DELETE FROM " . $this->episodes_table . " " .
+                    "WHERE show_id = %s AND episode_id IN %s",
+                    $show->show_id,
+                    $diff
                 )
             );
         }
-        podcast_scraper_wpdb_bulk_insert($this->episodes_table, $rows);
 
-        return $result;
+        return $current_time;
 
     }
 
     public function migrate() {
+
+        $migration = $this->cache->get('migration', 0);
+        if ($migration) {
+            return;
+        }
 
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
 
@@ -204,10 +243,13 @@ class Show {
                 episode_file_size bigint(20) NOT NULL,
                 episode_file_type varchar(100) NOT NULL,
                 episode_date date NOT NULL,
+                update_time bigint(20) unsigned DEFAULT 0,
                 PRIMARY KEY  (id),
                 KEY si_show_id (show_id)
             )".$charset_collate.";"
         );
+
+        $this->cache->set('migration', 1);
 
     }
 
@@ -218,6 +260,13 @@ class ShowFactory {
     public static function create() {
 
         return new Show(new WP_Remote());
+
+    }
+
+    public static function migrate() {
+
+        $show = self::create();
+        $show->migrate();
 
     }
 
