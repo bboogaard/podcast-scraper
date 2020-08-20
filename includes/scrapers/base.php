@@ -24,21 +24,40 @@ abstract class BaseScraper {
             'episodes' => array()
         );
 
-        $episodes = $this->get_episodes($show_id);
+        $episodes = $this->get_episodes($show_id, $max_episodes);
 
-        $num = 0;
         foreach ($episodes as $episode) {
-            if ($num == $max_episodes) {
-                break;
-            }
             array_push(
                 $result['episodes'],
                 $this->get_episode($episode['episode_id'])
             );
-            $num += 1;
         }
 
         return $result;
+
+    }
+
+    public function get_episodes($show_id, $max_episodes=30) {
+
+        $response = $this->wp_remote->get($this->get_episodes_url($show_id));
+        $html = wp_remote_retrieve_body($response);
+        if (!$html) {
+            return false;
+        }
+
+        $document = phpQuery::newDocument($html);
+
+        return array_slice(array_map(
+            function($episode) {
+                return wp_parse_args(
+                    $episode,
+                    array(
+                        'episode_id' => ''
+                    )
+                );
+            },
+            $this->extract_episodes($document)
+        ), 0, $max_episodes);
 
     }
 
@@ -59,30 +78,6 @@ abstract class BaseScraper {
                 'show_description' => '',
                 'show_image' => ''
             )
-        );
-
-    }
-
-    protected function get_episodes($show_id) {
-
-        $response = $this->wp_remote->get($this->get_episodes_url($show_id));
-        $html = wp_remote_retrieve_body($response);
-        if (!$html) {
-            return false;
-        }
-
-        $document = phpQuery::newDocument($html);
-
-        return array_map(
-            function($episode) {
-                return wp_parse_args(
-                    $episode,
-                    array(
-                        'episode_id' => ''
-                    )
-                );
-            },
-            $this->extract_episodes($document)
         );
 
     }
