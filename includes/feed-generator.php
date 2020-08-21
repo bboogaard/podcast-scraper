@@ -3,7 +3,7 @@
 namespace PodcastScraper;
 
 use \DateTime;
-use \FeedWriter\RSS2;
+use FeedWriter\RSS2;
 
 class FeedGenerator {
 

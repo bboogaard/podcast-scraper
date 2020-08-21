@@ -20,6 +20,38 @@ function podcast_scraper_get_scrapers() {
 
 }
 
+function podcast_scraper_wpdb_placeholder($param) {
+
+    switch (gettype($param)) {
+        case 'integer':
+            $placeholder = '%d';
+            break;
+        case "double":
+            $placeholder = '%f';
+            break;
+        default:
+            $placeholder = '%s';
+            break;
+    }
+
+    return $placeholder;
+
+}
+
+function podcast_scraper_wpdb_in_format($sql, $in_params) {
+
+    global $wpdb;
+
+    $num_params = count($in_params);
+    $placeholder = podcast_scraper_wpdb_placeholder($in_params[0]);
+
+    $placeholders = array_fill(0, $num_params, $placeholder);
+    $format = implode(', ', $placeholders);
+
+    return preg_replace('/IN(?:[\s|\n]+)%s/', sprintf('IN (%s)', $format), $sql);
+
+}
+
 function podcast_scraper_wpdb_bulk_insert($table, $rows) {
 
     global $wpdb;
