@@ -10,7 +10,7 @@ use \WP_List_Table;
 
 class ShowsTable extends WP_List_Table {
 
-    private $show;
+    private $show_db;
 
     function __construct($screen=null) {
 
@@ -23,7 +23,7 @@ class ShowsTable extends WP_List_Table {
             'screen'    => $screen
         ) );
 
-        $this->show = ShowFactory::create();
+        $this->show_db = new ShowDb();
 
     }
 
@@ -62,7 +62,6 @@ class ShowsTable extends WP_List_Table {
 
         $actions = array(
             'edit'      => sprintf('<a href="%s">%s</a>', $edit_url,  __('Bewerken', 'podcast-scraper')),
-            'sync'      => sprintf('<a href="?page=%s&action=%s&id=%d">%s</a>', $_REQUEST['page'], 'sync', $item['id'], __('Synchroniseren', 'podcast-scraper')),
             'delete'    => sprintf('<a href="?page=%s&action=%s&id=%d">%s</a>', $_REQUEST['page'], 'delete', $item['id'], __('Verwijderen', 'podcast-scraper')),
         );
 
@@ -93,8 +92,7 @@ class ShowsTable extends WP_List_Table {
     function get_bulk_actions() {
 
         $actions = array(
-            'delete'    => __('Verwijderen', 'podcast-scraper'),
-            'sync'      => __('Synchroniseren', 'podcast-scraper')
+            'delete'    => __('Verwijderen', 'podcast-scraper')
         );
         return $actions;
 
@@ -105,11 +103,11 @@ class ShowsTable extends WP_List_Table {
         if ( 'delete' === $this->current_action() ) {
             if ( isset($_GET['id']) ) {
                 $id = $_GET['id'];
-                $this->show->delete_show( $id );
+                $this->show_db->delete_show( $id );
             }
             if (isset($_GET['podcast'])) {
                 foreach ( $_GET['podcast'] as $id ) {
-                    $this->show->delete_show( $id );
+                    $this->show_db->delete_show( $id );
                 }
             }
 
@@ -117,27 +115,6 @@ class ShowsTable extends WP_List_Table {
                 array(
                     'page' => 'podcast_scraper_settings',
                     'message' => 'deleted'
-                ),
-                'admin.php'
-            );
-            wp_redirect( $redirect );
-        }
-
-        if ( 'sync' === $this->current_action() ) {
-            if ( isset($_GET['id']) ) {
-                $id = $_GET['id'];
-                $this->show->sync_show( $id, true );
-            }
-            if (isset($_GET['podcast'])) {
-                foreach ( $_GET['podcast'] as $id ) {
-                    $this->show->sync_show( $id, true );
-                }
-            }
-
-            $redirect = add_query_arg(
-                array(
-                    'page' => 'podcast_scraper_settings',
-                    'message' => 'synced'
                 ),
                 'admin.php'
             );
@@ -154,7 +131,7 @@ class ShowsTable extends WP_List_Table {
         $this->_column_headers = array($columns, $hidden, $sortable);
         $this->process_bulk_action();
 
-        $shows = $this->show->get_shows();
+        $shows = $this->show_db->get_shows();
         $items = array();
         foreach ($shows as $show) {
             array_push($items, (array)$show);

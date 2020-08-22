@@ -4,13 +4,15 @@ namespace PodcastScraper;
 
 class ShowManager {
 
+    private $show_db;
+
     public function __construct() {
 
         add_menu_page(__('Podcast Scraper', 'podcast-scraper'), __('Podcast Scraper', 'podcast-scraper'), 'manage_options', 'podcast_scraper_settings', array( $this, 'render_manager' ));
         add_submenu_page(NULL, __('Podcast Scraper', 'podcast-scraper'), __('Nieuwe podcast', 'podcast-scraper'), 'manage_options', 'podcast_scraper_add', array( $this, 'render_new' ));
         add_submenu_page(NULL, __('Podcast Scraper', 'podcast-scraper'), __('Bewerk podcast', 'podcast-scraper'), 'manage_options', 'podcast_scraper_edit', array( $this, 'render_update' ));
 
-        $this->show = ShowFactory::create();
+        $this->show_db = new ShowDb();
 
     }
 
@@ -53,7 +55,7 @@ class ShowManager {
 
         if ($_POST) {
             if (check_admin_referer('podcast-scraper', 'podcast-scraper')) {
-                $this->show->add_show(array(
+                $this->show_db->add_show(array(
                     'show_id' => $_POST['show_id'],
                     'scraper_handle' => $_POST['scraper_handle'],
                     'max_episodes' => $_POST['max_episodes']
@@ -116,7 +118,7 @@ class ShowManager {
 
         if ($_POST) {
             if (check_admin_referer('podcast-scraper', 'podcast-scraper')) {
-                $this->show->update_show(
+                $this->show_db->update_show(
                     $_GET['id'],
                     array(
                         'show_id' => $_POST['show_id'],
@@ -135,7 +137,7 @@ class ShowManager {
             wp_redirect($redirect_url);
         }
 
-        $show = $this->show->get_show($_GET['id']);
+        $show = $this->show_db->get_show($_GET['id']);
 
         $form_url = add_query_arg(
             array(
@@ -189,39 +191,12 @@ class ShowManagerFactory {
     public static function register() {
 
         add_action('admin_menu', array(__CLASS__, 'add_admin_menu'));
-        add_action('rest_api_init', array(__CLASS__, 'update_show'));
 
     }
 
     public static function add_admin_menu() {
 
         $show_manager = new ShowManager();
-
-    }
-
-    public static function update_show() {
-
-        register_rest_route( 'podcast-scraper/v1', '/podcast/(?P<id>\d+)/update', array(
-            'methods' => 'GET',
-            'callback' => array(__CLASS__, 'sync_show'),
-            'args' => array(
-                'id' => array(
-                    'validate_callback' => function($param, $request, $key) {
-                        return is_numeric( $param );
-                    }
-                ),
-            ),
-            'permission_callback' => function () {
-                return $_GET['token'] === '1234';
-            }
-        ) );
-
-    }
-
-    public static function sync_show($data) {
-
-        $show = ShowFactory::create();
-        return $show->sync_show($data['id']);
 
     }
 
