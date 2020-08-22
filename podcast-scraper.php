@@ -13,9 +13,11 @@
  */
 
 // Your code starts here.
-define('PODCAST_SCRAPER_PATH', __FILE__);
+define('PODCAST_SCRAPER_PATH', dirname(__FILE__));
 
-require('vendor/autoload.php');
+if (file_exists(PODCAST_SCRAPER_PATH . '/vendor/autoload.php')) {
+    require(PODCAST_SCRAPER_PATH . '/vendor/autoload.php');
+}
 
 if (!class_exists('DOMEvent')) {
     require('ext/phpQuery.php');
