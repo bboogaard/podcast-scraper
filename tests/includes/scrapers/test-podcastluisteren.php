@@ -217,4 +217,81 @@ class TestPodcastLuisterenScraper extends WP_UnitTestCase {
 
     }
 
+    public function test_scrape_episode_offset() {
+
+        $show_html = file_get_contents(path_join($this->support_dir, 'show.html'));
+
+        $this->wp_remote->shouldReceive('get')
+                        ->with('https://podcastluisteren.nl/pod/the-talk-show')
+                        ->andReturn(array(
+                            'body' => $show_html
+                        ));
+
+        $this->wp_remote->shouldReceive('get')
+                        ->with('https://podcastluisteren.nl/ep/we-talk-about-stuff')
+                        ->times(0);
+
+        $this->wp_remote->shouldReceive('head')
+                        ->with('/path/to/audio.mp3')
+                        ->times(0);
+
+        $this->wp_remote->shouldReceive('head')
+                        ->with('/path/to/real-audio.mp3')
+                        ->times(0);
+
+        $episode_html = file_get_contents(path_join($this->support_dir, 'episode_2.html'));
+
+        $this->wp_remote->shouldReceive('get')
+                        ->with('https://podcastluisteren.nl/ep/the-buzz')
+                        ->andReturn(array(
+                            'body' => $episode_html
+                        ));
+
+        $this->wp_remote->shouldReceive('head')
+                        ->with('/path/to/buzz.mp3')
+                        ->andReturn(array(
+                            'response' => array(
+                                'code' => 302
+                            ),
+                            'headers' => array(
+                                'Location' => '/path/to/real-buzz.mp3'
+                            )
+                        ));
+
+        $this->wp_remote->shouldReceive('head')
+                        ->with('/path/to/real-buzz.mp3')
+                        ->andReturn(array(
+                            'response' => array(
+                                'code' => 200
+                            ),
+                            'headers' => array(
+                                'Content-length' => 50000000,
+                                'Content-type' => 'audio/mp3'
+                            )
+                        ));
+
+        $actual = $this->scraper->scrape('the-talk-show', 2, 1, 1);
+        $expected = array(
+            'show' => array(
+                'show_title' => 'The talk show',
+                'show_description' => 'Lorem ipsum dolor sit amet...',
+                'show_image' => '/path/to/image.jpg'
+            ),
+            'episodes' => array(
+                array(
+                    'episode_id' => 'the-buzz',
+                    'episode_title' => 'The buzz',
+                    'episode_description' => 'Buzz...',
+                    'episode_image' => '/path/to/image.jpg',
+                    'episode_file' => '/path/to/buzz.mp3',
+                    'episode_date' => '2020-08-16',
+                    'episode_file_size' => 50000000,
+                    'episode_file_type' => 'audio/mp3'
+                )
+            )
+        );
+        $this->assertEquals($expected, $actual);
+
+    }
+
 }

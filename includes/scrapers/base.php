@@ -17,14 +17,19 @@ abstract class BaseScraper {
 
     }
 
-    public function scrape($show_id, $max_episodes=30) {
+    public function scrape($show_id, $max_episodes=30, $num_episodes=10,
+                           $episode_offset=0) {
 
         $result = array(
             'show' => $this->get_show($show_id),
             'episodes' => array()
         );
 
-        $episodes = $this->get_episodes($show_id, $max_episodes);
+        $episodes = array_slice(
+            $this->get_episodes($show_id, $max_episodes),
+            $episode_offset,
+            $num_episodes
+        );
 
         foreach ($episodes as $episode) {
             array_push(
