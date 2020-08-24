@@ -33,6 +33,7 @@ class ShowsTable extends WP_List_Table {
             case 'cb':
             case 'show_id':
             case 'scaper_handle':
+            case 'feed_url':
                 return $item[$column_name];
             default:
                 return print_r($item,true); //Show the whole array for troubleshooting purposes
@@ -78,12 +79,25 @@ class ShowsTable extends WP_List_Table {
 
     }
 
+    function column_feed_url($item) {
+
+        return sprintf(
+            '<span><a href="%1$s" target="_blank">%2$s</a></span>',
+            esc_attr(
+                site_url(sprintf('feed/podcasts/%d-%s', $item['id'], $item['show_id']))
+            ),
+            site_url(sprintf('feed/podcasts/%d-%s', $item['id'], $item['show_id']))
+        );
+
+    }
+
     function get_columns() {
 
         $columns = array(
             'cb'              => '<input type="checkbox" />',
             'show_id'         => 'Podcast-id',
-            'scraper_handle'  => 'Scraper'
+            'scraper_handle'  => 'Scraper',
+            'feed_url'        => __('Feed-url', 'podcast-scraper')
         );
         return $columns;
 
