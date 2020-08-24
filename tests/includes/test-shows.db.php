@@ -27,6 +27,14 @@ class TestShowDb extends WP_UnitTestCase {
 
     }
 
+    function tearDown() {
+
+        parent::tearDown();
+
+        delete_option('foobar');
+
+    }
+
     function setUpTestData() {
 
         $this->wpdb->insert(
@@ -78,6 +86,13 @@ class TestShowDb extends WP_UnitTestCase {
             array_push($actual, $show->show_id);
         }
         $expected = array('the-talk-show');
+        $this->assertEquals($expected, $actual);
+
+        $actual = array();
+        foreach ($shows as $show) {
+            array_push($actual, $show->episode_count);
+        }
+        $expected = array(2);
         $this->assertEquals($expected, $actual);
 
     }
@@ -176,6 +191,8 @@ class TestShowDb extends WP_UnitTestCase {
 
     public function test_delete_show() {
 
+        add_action('podcast-scraper-show-delete', array($this, 'delete_action'));
+
         $this->show_db->delete_show($this->show_id);
 
         $actual = $this->wpdb->get_row(
@@ -192,6 +209,12 @@ class TestShowDb extends WP_UnitTestCase {
         $expected = array();
         $this->assertEquals($expected, $actual);
 
+        $actual = get_option('foobar');
+        $expected = '1';
+        $this->assertEquals($expected, $actual);
+
+        remove_action('podcast-scraper-show-delete', array($this, 'delete_action'));
+
     }
 
     public function test_get_episodes() {
@@ -203,6 +226,14 @@ class TestShowDb extends WP_UnitTestCase {
         }
         $expected = array('we-talk-about-stuff', 'the-buzz');
         $this->assertEquals($expected, $actual);
+
+    }
+
+    function delete_action($show) {
+
+        if ($show->id == $this->show_id) {
+            update_option('foobar', '1');
+        }
 
     }
 

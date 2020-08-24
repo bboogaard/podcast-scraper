@@ -25,8 +25,14 @@ class ShowDb {
     public function get_shows() {
 
         return $this->wpdb->get_results(
-            "SELECT * FROM " . $this->shows_table . " " .
-            "ORDER BY show_id"
+            "SELECT s.*, e.episode_count FROM " . $this->shows_table . " s " .
+            "    LEFT JOIN " .
+            "    (" .
+            "        SELECT COUNT(id) AS episode_count, show_id " .
+            "        FROM " . $this->episodes_table . " " .
+            "        GROUP BY show_id " .
+            "    ) e ON s.id = e.show_id " .
+            "ORDER BY s.show_id"
         );
 
     }
@@ -77,6 +83,10 @@ class ShowDb {
     }
 
     public function delete_show($id) {
+
+        $show = $this->get_show($id);
+
+        do_action('podcast-scraper-show-delete', $show);
 
         $this->wpdb->query(
             $this->wpdb->prepare(
@@ -135,6 +145,8 @@ class ShowDb {
                 show_image varchar(255) DEFAULT '',
                 update_time bigint(20) unsigned DEFAULT 0,
                 max_episodes int(10) unsigned DEFAULT 30,
+                num_episodes int(10) unsigned DEFAULT 10,
+                total_episodes int(10) unsigned DEFAULT 0,
                 PRIMARY KEY  (id),
                 KEY si_show_id (show_id)
             )".$charset_collate.";
