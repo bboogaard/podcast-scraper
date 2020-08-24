@@ -171,6 +171,10 @@ class TestShowFeedHandler extends WP_UnitTestCase {
         $expected = 2;
         $this->assertEquals($expected, $actual);
 
+        $actual = get_option(sprintf('podcast-scraper-%d-episode-offset', $this->show_id));
+        $expected = 10;
+        $this->assertEquals($expected, $actual);
+
     }
 
     public function test_render_feed_not_changed() {
@@ -395,6 +399,125 @@ class TestShowFeedHandler extends WP_UnitTestCase {
                 $this->show_id
             )
         );
+        $expected = 1;
+        $this->assertEquals($expected, $actual);
+
+    }
+
+    public function test_render_feed_with_episode_offset() {
+
+        $this->wpdb->update(
+            $this->wpdb->prefix . "podcast_scraper_shows",
+            array(
+                'num_episodes' => 1
+            ),
+            array(
+                'id' => $this->show_id
+            )
+        );
+
+        $show = $this->wpdb->get_row(
+            $this->wpdb->prepare(
+                "SELECT * FROM " . $this->wpdb->prefix . "podcast_scraper_shows " .
+                "WHERE id = %d",
+                $this->show_id
+            )
+        );
+
+        $this->scraper->shouldReceive('get_episodes')
+                      ->with($show->show_id, $show->max_episodes)
+                      ->andReturn(array(
+                          array(
+                              'episode_id' => 'we-talk-about-stuff'
+                          ),
+                          array(
+                              'episode_id' => 'the-buzz'
+                          )
+                      ));
+
+        $this->scraper->shouldReceive('scrape')
+                      ->with(
+                          $show->show_id, $show->max_episodes,
+                          $show->num_episodes, 1
+                      )
+                      ->andReturn(
+                          array(
+                              'show' => array(
+                                  'show_title' => 'The talk show',
+                                  'show_description' => 'Lorem ipsum dolor sit amet...',
+                                  'show_image' => '/path/to/image.jpg'
+                              ),
+                              'episodes' => array(
+                                  array(
+                                      'episode_id' => 'the-buzz',
+                                      'episode_title' => 'The buzz',
+                                      'episode_description' => 'Buzz...',
+                                      'episode_image' => '/path/to/image.jpg',
+                                      'episode_file' => '/path/to/buzz.mp3',
+                                      'episode_date' => '2020-08-16',
+                                      'episode_file_size' => 50000000,
+                                      'episode_file_type' => 'audio/mp3'
+                                  )
+                              )
+                      ));
+
+        $this->http->shouldReceive('send_header')->times(1);
+
+        update_option(sprintf('podcast-scraper-%d-episode-offset', $this->show_id), 1);
+
+        $feed_handler = new ShowFeedHandler($this->http, $show, $this->scraper);
+        ob_start();
+        $feed_handler->render_feed();
+        ob_end_clean();
+
+        $actual = get_option(sprintf('podcast-scraper-%d-episode-offset', $this->show_id));
+        $expected = 2;
+        $this->assertEquals($expected, $actual);
+
+        $this->scraper->shouldReceive('get_episodes')
+                      ->with($show->show_id, $show->max_episodes)
+                      ->andReturn(array(
+                          array(
+                              'episode_id' => 'we-talk-about-stuff'
+                          ),
+                          array(
+                              'episode_id' => 'the-buzz'
+                          )
+                      ));
+
+        $this->scraper->shouldReceive('scrape')
+                      ->with(
+                          $show->show_id, $show->max_episodes,
+                          $show->num_episodes, 0
+                      )
+                      ->andReturn(
+                          array(
+                              'show' => array(
+                                  'show_title' => 'The talk show',
+                                  'show_description' => 'Lorem ipsum dolor sit amet...',
+                                  'show_image' => '/path/to/image.jpg'
+                              ),
+                              'episodes' => array(
+                                  array(
+                                      'episode_id' => 'we-talk-about-stuff',
+                                      'episode_title' => 'We talk about stuff',
+                                      'episode_description' => 'Foo bar baz qux...',
+                                      'episode_image' => '/path/to/image.jpg',
+                                      'episode_file' => '/path/to/audio.mp3',
+                                      'episode_date' => '2020-08-15',
+                                      'episode_file_size' => 60000000,
+                                      'episode_file_type' => 'audio/mp3'
+                                  )
+                              )
+                      ));
+
+        $this->http->shouldReceive('send_header')->times(1);
+
+        ob_start();
+        $feed_handler->render_feed();
+        ob_end_clean();
+
+        $actual = get_option(sprintf('podcast-scraper-%d-episode-offset', $this->show_id));
         $expected = 1;
         $this->assertEquals($expected, $actual);
 
