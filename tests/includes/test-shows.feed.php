@@ -34,8 +34,9 @@ class TestShowFeedHandler extends WP_UnitTestCase {
 
         Mockery::close();
 
-        delete_option('podcast-scraper-feed-updated');
-        delete_option('podcast-scraper-feed-content');
+        delete_option(sprintf('podcast-scraper-%d-feed-updated', $this->show_id));
+        delete_option(sprintf('podcast-scraper-%d-feed-content', $this->show_id));
+        delete_option(sprintf('podcast-scraper-%d-episode-offset', $this->show_id));
 
     }
 
@@ -77,7 +78,10 @@ class TestShowFeedHandler extends WP_UnitTestCase {
                       ));
 
         $this->scraper->shouldReceive('scrape')
-                      ->with($show->show_id, $show->max_episodes)
+                      ->with(
+                          $show->show_id, $show->max_episodes,
+                          $show->num_episodes, 0
+                      )
                       ->andReturn(
                           array(
                               'show' => array(
@@ -234,8 +238,14 @@ class TestShowFeedHandler extends WP_UnitTestCase {
 
         $this->http->shouldReceive('send_header')->times(1);
 
-        update_option('podcast-scraper-feed-updated', $update_time);
-        update_option('podcast-scraper-feed-content', 'asdf');
+        update_option(
+            sprintf('podcast-scraper-%d-feed-updated', $this->show_id),
+            $update_time
+        );
+        update_option(
+            sprintf('podcast-scraper-%d-feed-content', $this->show_id),
+            'asdf'
+        );
 
         $feed_handler = new ShowFeedHandler($this->http, $show, $this->scraper);
         ob_start();
@@ -304,7 +314,10 @@ class TestShowFeedHandler extends WP_UnitTestCase {
                       ));
 
         $this->scraper->shouldReceive('scrape')
-                      ->with($show->show_id, $show->max_episodes)
+                      ->with(
+                          $show->show_id, $show->max_episodes,
+                          $show->num_episodes, 0
+                      )
                       ->andReturn(
                           array(
                               'show' => array(
@@ -409,7 +422,10 @@ class TestShowFeedHandler extends WP_UnitTestCase {
                       ));
 
         $this->scraper->shouldReceive('scrape')
-                      ->with($show->show_id, $show->max_episodes)
+                      ->with(
+                          $show->show_id, $show->max_episodes,
+                          $show->num_episodes, 0
+                      )
                       ->andReturn(
                           array(
                               'show' => array(

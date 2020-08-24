@@ -28,7 +28,7 @@ class ShowFeedHandler {
             '%d-%s', $this->show->id, $this->show->show_id
         );
 
-        $this->cache = new Cache('podcast-scraper-');
+        $this->cache = new Cache(sprintf('podcast-scraper-%d-', $this->show->id));
 
         $this->feed_generator = new FeedGenerator(
             $this->show->show_title,
@@ -41,11 +41,23 @@ class ShowFeedHandler {
 
         add_action('init', array($this, 'add_feed'));
 
+        add_action('podcast-scraper-show-delete', array($this, 'delete_show'));
+
     }
 
     public function add_feed() {
 
         add_feed('podcasts/' . $this->feed_id, array($this, 'render_feed'));
+
+    }
+
+    public function delete_show($show) {
+
+        if ($show->id == $this->show->id) {
+            $this->cache->delete('feed-updated');
+            $this->cache->delete('feed-content');
+            $this->cache->delete('episode-offset');
+        }
 
     }
 
@@ -80,7 +92,7 @@ class ShowFeedHandler {
 
     }
 
-    private function sync_show() {
+    public function sync_show() {
 
         $episodes = $this->scraper->get_episodes(
             $this->show->show_id, $this->show->max_episodes);
@@ -104,8 +116,14 @@ class ShowFeedHandler {
             return $this->show->update_time;
         }
 
+        $offset = $this->cache->get('episode-offset', 0);
+        if ($offset >= count($new_episodes)) {
+            $offset = 0;
+        }
+
         $result = $this->scraper->scrape(
-            $this->show->show_id, $this->show->max_episodes);
+            $this->show->show_id, $this->show->max_episodes,
+            $this->show->num_episodes, $offset);
         if (!$result['show']['show_title']) {
             error_log('Incomplete show info.');
             return false;
@@ -119,7 +137,8 @@ class ShowFeedHandler {
                 'show_title' => $result['show']['show_title'],
                 'show_description' => $result['show']['show_description'],
                 'show_image' => $result['show']['show_image'],
-                'update_time' => $current_time
+                'update_time' => $current_time,
+                'total_episodes' => count($new_episodes)
             )
         );
 
@@ -127,7 +146,7 @@ class ShowFeedHandler {
         foreach ($result['episodes'] as $episode) {
             if (!$episode['episode_id'] || !$episode['episode_title'] ||
                     !$episode['episode_file'] || !$episode['episode_date']) {
-                error_log('Incomplete episode info.');
+                error_log(sprintf('Incomplete episode info for episode %s', print_r($episode, true)));
                 return false;
             }
             if (!in_array($episode['episode_id'], $existing_episodes)) {
@@ -165,6 +184,8 @@ class ShowFeedHandler {
                 )
             );
         }
+
+        $this->cache->set('episode-offset', $offset + $this->show->num_episodes);
 
         return $current_time;
 
@@ -204,19 +225,25 @@ class ShowFeedHandler {
 
 class ShowFeed {
 
+    public static function get_feed_handler($show) {
+
+        $scraper_class = podcast_scraper_get_scraper_class(
+            $show->scraper_handle);
+        if (!$scraper_class) {
+            return null;
+        }
+        return new ShowFeedHandler(
+            new Http(), $show, new $scraper_class(new WP_Remote())
+        );
+
+    }
+
     public static function register() {
 
         $show_db = new ShowDb();
         $shows = $show_db->get_shows();
         foreach ($shows as $show) {
-            $scraper_class = podcast_scraper_get_scraper_class(
-                $show->scraper_handle);
-            if (!$scraper_class) {
-                continue;
-            }
-            $feed_handler = new ShowFeedHandler(
-                new Http(), $show, new $scraper_class(new WP_Remote())
-            );
+            self::get_feed_handler($show);
         }
 
     }
