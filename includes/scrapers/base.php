@@ -17,7 +17,7 @@ abstract class BaseScraper {
 
     }
 
-    public function scrape($show_id, $max_episodes=30, $num_episodes=10,
+    public function scrape($show_id, $max_episodes=0, $num_episodes=10,
                            $episode_offset=0) {
 
         $result = array(
@@ -42,7 +42,7 @@ abstract class BaseScraper {
 
     }
 
-    public function get_episodes($show_id, $max_episodes=30) {
+    public function get_episodes($show_id, $max_episodes=0) {
 
         $response = $this->wp_remote->get($this->get_episodes_url($show_id));
         $html = wp_remote_retrieve_body($response);
@@ -51,6 +51,10 @@ abstract class BaseScraper {
         }
 
         $document = phpQuery::newDocument($html);
+
+        if (!$max_episodes) {
+            return $this->extract_episodes($document);
+        }
 
         return array_slice(array_map(
             function($episode) {
