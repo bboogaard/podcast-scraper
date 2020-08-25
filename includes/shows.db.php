@@ -144,7 +144,7 @@ class ShowDb {
                 show_description text DEFAULT '',
                 show_image varchar(255) DEFAULT '',
                 update_time bigint(20) unsigned DEFAULT 0,
-                max_episodes int(10) unsigned DEFAULT 30,
+                max_episodes int(10) unsigned DEFAULT 0,
                 num_episodes int(10) unsigned DEFAULT 10,
                 total_episodes int(10) unsigned DEFAULT 0,
                 PRIMARY KEY  (id),
