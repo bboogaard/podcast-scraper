@@ -14,6 +14,8 @@ class ShowManager {
 
         $this->show_db = new ShowDb();
 
+        add_action('admin_enqueue_scripts', array($this, 'admin_enqueue_scripts'));
+
     }
 
     public function render_manager() {
@@ -23,13 +25,13 @@ class ShowManager {
                 case 'deleted':
                     printf('<div class="updated"><p><strong>%s</strong></p></div>', __('Podcast verwijderd', 'podcast-scraper'));
                     break;
-                case 'synced':
+                case 'sync':
                     printf('<div class="updated"><p><strong>%s</strong></p></div>', __('Podcast gesynchroniseerd', 'podcast-scraper'));
                     break;
             }
         }
 
-        $table = new ShowsTable();
+        $table = new ShowTable();
         $table->prepare_items();
         $new_url = add_query_arg(
             array(
@@ -55,10 +57,12 @@ class ShowManager {
 
         if ($_POST) {
             if (check_admin_referer('podcast-scraper', 'podcast-scraper')) {
+                $max_episodes = isset($_POST['max_episodes']) ? $_POST['max_episodes'] : 0;
                 $this->show_db->add_show(array(
                     'show_id' => $_POST['show_id'],
                     'scraper_handle' => $_POST['scraper_handle'],
-                    'max_episodes' => $_POST['max_episodes']
+                    'max_episodes' => $max_episodes,
+                    'num_episodes' => $_POST['num_episodes']
                 ));
             }
 
@@ -102,8 +106,15 @@ class ShowManager {
 
         echo '<br/>';
 
-        printf('                <label for="max_episodes">%s</label>', __('Aantal te synchroniseren afleveringen', 'podcast-scraper'));
-        echo '                <input name="max_episodes" id="max_episodes" type="number" value="30" class="small-text" />';
+        echo '                <label for="max_episodes">';
+        echo '                <input name="limit_episodes" id="limit_episodes" type="checkbox" />';
+        echo __('Beperk te synchroniseren afleveringen tot: ', 'podcast-scraper');
+        echo '                <input name="max_episodes" id="max_episodes" type="number" value="0" class="small-text" /></label>';
+
+        echo '<br/>';
+
+        printf('                <label for="num_episodes">%s</label>', __('Aantal te synchroniseren afleveringen per sessie', 'podcast-scraper'));
+        echo '                <input name="num_episodes" id="num_episodes" type="number" value="10" class="small-text" />';
 
         submit_button(__('Opslaan', 'podcast-scraper'));
 
@@ -118,12 +129,14 @@ class ShowManager {
 
         if ($_POST) {
             if (check_admin_referer('podcast-scraper', 'podcast-scraper')) {
+                $max_episodes = isset($_POST['max_episodes']) ? $_POST['max_episodes'] : 0;
                 $this->show_db->update_show(
                     $_GET['id'],
                     array(
                         'show_id' => $_POST['show_id'],
                         'scraper_handle' => $_POST['scraper_handle'],
-                        'max_episodes' => $_POST['max_episodes']
+                        'max_episodes' => $max_episodes,
+                        'num_episodes' => $_POST['num_episodes']
                     )
                 );
             }
@@ -172,8 +185,16 @@ class ShowManager {
 
         echo '<br/>';
 
-        printf('                <label for="max_episodes">%s</label>', __('Aantal te synchroniseren afleveringen', 'podcast-scraper'));
-        printf('                <input name="max_episodes" id="max_episodes" type="number" value="%d" class="small-text" />', $show->max_episodes);
+        echo '                <label for="max_episodes">';
+        $checked = $show->max_episodes ? ' checked' : '';
+        printf('                <input name="limit_episodes" id="limit_episodes" type="checkbox"%s />', $checked);
+        echo __('Beperk te synchroniseren afleveringen tot: ', 'podcast-scraper');
+        printf('                <input name="max_episodes" id="max_episodes" type="number" value="%d" class="small-text" /></label>', $show->max_episodes);
+
+        echo '<br/>';
+
+        printf('                <label for="num_episodes">%s</label>', __('Aantal te synchroniseren afleveringen per sessie', 'podcast-scraper'));
+        printf('                <input name="num_episodes" id="num_episodes" type="number" value="%d" class="small-text" />', $show->num_episodes);
 
         submit_button(__('Opslaan', 'podcast-scraper'));
 
@@ -181,6 +202,17 @@ class ShowManager {
         echo '        </div>';
         echo '    </div>';
         echo '</div>';
+
+    }
+
+    public function admin_enqueue_scripts() {
+
+        wp_enqueue_script(
+            'podcast-scraper-edit-show',
+            podcast_scraper_url('js/edit_show.js'),
+            array('jquery'),
+            filemtime(PODCAST_SCRAPER_PATH . '/js/edit_show.js')
+        );
 
     }
 

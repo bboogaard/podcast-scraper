@@ -86,3 +86,9 @@ function podcast_scraper_wpdb_bulk_insert($table, $rows) {
 	return $wpdb->query($wpdb->prepare($sql, $data));
 
 }
+
+function podcast_scraper_url($path) {
+
+    return plugins_url($path, PODCAST_SCRAPER_PATH . '/podcast-scraper.php');
+
+}
