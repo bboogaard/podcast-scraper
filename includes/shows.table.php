@@ -8,7 +8,7 @@ if(!class_exists('WP_List_Table')){
 
 use \WP_List_Table;
 
-class ShowsTable extends WP_List_Table {
+class ShowTable extends WP_List_Table {
 
     private $show_db;
 
@@ -34,6 +34,7 @@ class ShowsTable extends WP_List_Table {
             case 'show_id':
             case 'scaper_handle':
             case 'feed_url':
+            case 'episode_count':
                 return $item[$column_name];
             default:
                 return print_r($item,true); //Show the whole array for troubleshooting purposes
@@ -64,6 +65,7 @@ class ShowsTable extends WP_List_Table {
         $actions = array(
             'edit'      => sprintf('<a href="%s">%s</a>', $edit_url,  __('Bewerken', 'podcast-scraper')),
             'delete'    => sprintf('<a href="?page=%s&action=%s&id=%d">%s</a>', $_REQUEST['page'], 'delete', $item['id'], __('Verwijderen', 'podcast-scraper')),
+            'sync'      => sprintf('<a href="?page=%s&action=%s&id=%d">%s</a>', $_REQUEST['page'], 'sync', $item['id'], __('Synchroniseren', 'podcast-scraper')),
         );
 
         return sprintf('<strong>%1$s</strong> %2$s',
@@ -91,13 +93,26 @@ class ShowsTable extends WP_List_Table {
 
     }
 
+    function column_episode_count($item) {
+
+        if (!$item['update_time']) {
+            return sprintf(
+                '<span>%1$s</span>', __('Nog niet gesynchroniseerd', 'podcast-scraper')
+            );
+        }
+
+        return sprintf('<span>%1$s (van %2$s)</span>', $item['episode_count'], $item['total_episodes']);
+
+    }
+
     function get_columns() {
 
         $columns = array(
             'cb'              => '<input type="checkbox" />',
-            'show_id'         => 'Podcast-id',
-            'scraper_handle'  => 'Scraper',
-            'feed_url'        => __('Feed-url', 'podcast-scraper')
+            'show_id'         => __('Podcast-id', 'podcast-scraper'),
+            'scraper_handle'  => __('Scraper', 'podcast-scraper'),
+            'feed_url'        => __('Feed-url', 'podcast-scraper'),
+            'episode_count'   => __('Aantal afleveringen', 'podcast-scraper')
         );
         return $columns;
 
@@ -129,6 +144,24 @@ class ShowsTable extends WP_List_Table {
                 array(
                     'page' => 'podcast_scraper_settings',
                     'message' => 'deleted'
+                ),
+                'admin.php'
+            );
+            wp_redirect( $redirect );
+        }
+
+        if ( 'sync' === $this->current_action() ) {
+            if ( isset($_GET['id']) ) {
+                $id = $_GET['id'];
+                $show = $this->show_db->get_show( $id );
+                $feed_handler = ShowFeed::get_feed_handler($show);
+                $feed_handler->sync_show();
+            }
+
+            $redirect = add_query_arg(
+                array(
+                    'page' => 'podcast_scraper_settings',
+                    'message' => 'sync'
                 ),
                 'admin.php'
             );
