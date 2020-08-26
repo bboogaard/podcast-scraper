@@ -11,7 +11,7 @@ use PodcastScraper\ShowDb;
 /**
  * Tests for the ShowDb class
  */
-class TestShowDb extends WP_UnitTestCase {
+class TestShowDb extends PodcastScraperTestCase {
 
     function setUp() {
 

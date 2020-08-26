@@ -11,7 +11,7 @@ use PodcastScraper\PodcastLuisterenScraper;
 /**
  * Tests for the PodcastLuisterenScraper class
  */
-class TestPodcastLuisterenScraper extends WP_UnitTestCase {
+class TestPodcastLuisterenScraper extends PodcastScraperTestCase {
 
     function setUp() {
 

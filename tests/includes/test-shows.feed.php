@@ -11,7 +11,7 @@ use PodcastScraper\ShowFeedHandler;
 /**
  * Tests for the ShowFeedHandler class
  */
-class TestShowFeedHandler extends WP_UnitTestCase {
+class TestShowFeedHandler extends PodcastScraperTestCase {
 
     function setUp() {
 
@@ -588,18 +588,6 @@ class TestShowFeedHandler extends WP_UnitTestCase {
         $output = ob_get_clean();
 
         $this->assertEquals('', $output);
-
-    }
-
-    function assertOutputContains($value, $output) {
-
-        $this->assertTrue(false !== strpos($output, $value));
-
-    }
-
-    function assertOutputNotContains($value, $output) {
-
-        $this->assertTrue(false === strpos($output, $value));
 
     }
 
