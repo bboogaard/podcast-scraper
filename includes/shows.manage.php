@@ -2,11 +2,19 @@
 
 namespace PodcastScraper;
 
+use WP\WP_Redirect;
+use WP\WP_Referer;
+
 class ShowManager {
 
-    private $show_db;
+    private $screen, $show_db, $wp_redirect, $wp_referer;
 
-    public function __construct() {
+    public function __construct(WP_Referer $wp_referer, WP_Redirect $wp_redirect,
+                                $screen=null) {
+
+        $this->wp_redirect = $wp_redirect;
+        $this->wp_referer = $wp_referer;
+        $this->screen = $screen;
 
         add_menu_page(__('Podcast Scraper', 'podcast-scraper'), __('Podcast Scraper', 'podcast-scraper'), 'manage_options', 'podcast_scraper_settings', array( $this, 'render_manager' ));
         add_submenu_page(NULL, __('Podcast Scraper', 'podcast-scraper'), __('Nieuwe podcast', 'podcast-scraper'), 'manage_options', 'podcast_scraper_add', array( $this, 'render_new' ));
@@ -28,10 +36,13 @@ class ShowManager {
                 case 'sync':
                     printf('<div class="updated"><p><strong>%s</strong></p></div>', __('Podcast gesynchroniseerd', 'podcast-scraper'));
                     break;
+                case 'notfound':
+                    printf('<div class="updated"><p><strong>%s</strong></p></div>', __('Podcast niet gevonden', 'podcast-scraper'));
+                    break;
             }
         }
 
-        $table = new ShowTable();
+        $table = new ShowTable($this->screen);
         $table->prepare_items();
         $new_url = add_query_arg(
             array(
@@ -56,7 +67,7 @@ class ShowManager {
     public function render_new() {
 
         if ($_POST) {
-            if (check_admin_referer('podcast-scraper', 'podcast-scraper')) {
+            if ($this->wp_referer->check_admin_referer('podcast-scraper', 'podcast-scraper')) {
                 $max_episodes = isset($_POST['max_episodes']) ? $_POST['max_episodes'] : 0;
                 $this->show_db->add_show(array(
                     'show_id' => $_POST['show_id'],
@@ -72,7 +83,7 @@ class ShowManager {
                 ),
                 admin_url('admin.php')
             );
-            wp_redirect($redirect_url);
+            $this->wp_redirect->redirect($redirect_url);
         }
 
         $form_url = add_query_arg(
@@ -90,7 +101,7 @@ class ShowManager {
         wp_nonce_field( 'podcast-scraper', 'podcast-scraper');
 
         printf('                <label for="show_id">%s</label>', __('Naam podcast', 'podcast-scraper'));
-        echo '                <input name="show_id" id="show_id" type="text" value="" class="regular-text" />';
+        echo '                <input name="show_id" id="show_id" type="text" required value="" class="regular-text" />';
 
         echo '<br/>';
 
@@ -109,12 +120,12 @@ class ShowManager {
         echo '                <label for="max_episodes">';
         echo '                <input name="limit_episodes" id="limit_episodes" type="checkbox" />';
         echo __('Beperk te synchroniseren afleveringen tot: ', 'podcast-scraper');
-        echo '                <input name="max_episodes" id="max_episodes" type="number" value="0" class="small-text" /></label>';
+        echo '                <input name="max_episodes" id="max_episodes" type="number" value="0" min="0" class="small-text" /></label>';
 
         echo '<br/>';
 
         printf('                <label for="num_episodes">%s</label>', __('Aantal te synchroniseren afleveringen per sessie', 'podcast-scraper'));
-        echo '                <input name="num_episodes" id="num_episodes" type="number" value="10" class="small-text" />';
+        echo '                <input name="num_episodes" id="num_episodes" type="number" required value="10" min="1"  class="small-text" />';
 
         submit_button(__('Opslaan', 'podcast-scraper'));
 
@@ -128,7 +139,7 @@ class ShowManager {
     public function render_update() {
 
         if ($_POST) {
-            if (check_admin_referer('podcast-scraper', 'podcast-scraper')) {
+            if ($this->wp_referer->check_admin_referer('podcast-scraper', 'podcast-scraper')) {
                 $max_episodes = isset($_POST['max_episodes']) ? $_POST['max_episodes'] : 0;
                 $this->show_db->update_show(
                     $_GET['id'],
@@ -147,61 +158,80 @@ class ShowManager {
                 ),
                 admin_url('admin.php')
             );
-            wp_redirect($redirect_url);
+            $this->wp_redirect->redirect($redirect_url);
         }
 
-        $show = $this->show_db->get_show($_GET['id']);
+        $id = isset($_GET['id']) ? $_GET['id'] : '';
+        if ($id) {
+            $show = $this->show_db->get_show($id);
+        }
+        else {
+            $show = null;
+        }
 
-        $form_url = add_query_arg(
-            array(
-                'page' => 'podcast_scraper_edit',
-                'id' => $_GET['id']
-            ),
-            admin_url('admin.php')
-        );
+        if (!$show) {
+            $redirect_url = add_query_arg(
+                array(
+                    'page' => 'podcast_scraper_settings',
+                    'message' => 'notfound'
+                ),
+                admin_url('admin.php')
+            );
+            $this->wp_redirect->redirect($redirect_url);
+        }
+        else {
+            echo '<div class="wrap">';
+            printf('    <div id="icon-options-general" class="icon32"><br></div><h2>%s</h2>', __('Bewerk podcast', 'podcast-scraper'));
 
-        echo '<div class="wrap">';
-        printf('    <div id="icon-options-general" class="icon32"><br></div><h2>%s</h2>', __('Bewerk podcast', 'podcast-scraper'));
-        echo '        <div class="form-wrap">';
-        printf('            <form id="podcast-form" method="post" action="%s">', $form_url);
+            $form_url = add_query_arg(
+                array(
+                    'page' => 'podcast_scraper_edit',
+                    'id' => $id
+                ),
+                admin_url('admin.php')
+            );
 
-        wp_nonce_field( 'podcast-scraper', 'podcast-scraper');
+            echo '        <div class="form-wrap">';
+            printf('            <form id="podcast-form" method="post" action="%s">', $form_url);
 
-        printf('                <label for="show_id">%s</label>', __('Naam podcast', 'podcast-scraper'));
-        printf('                <input name="show_id" id="show_id" type="text" value="%s" class="regular-text" />', esc_attr($show->show_id));
+            wp_nonce_field( 'podcast-scraper', 'podcast-scraper');
 
-        echo '<br/>';
+            printf('                <label for="show_id">%s</label>', __('Naam podcast', 'podcast-scraper'));
+            printf('                <input name="show_id" id="show_id" type="text" required value="%s" class="regular-text" />', esc_attr($show->show_id));
 
-        printf('                <label for="scraper_handle">%s</label>', __('Podcast-site', 'podcast-scraper'));
-        echo '                <select name="scraper_handle" id="scraper_handle">';
+            echo '<br/>';
 
-        $options = podcast_scraper_get_scrapers();
-        foreach ($options as $key => $value):
-        $checked = $key == $show->scraper_handle ? ' checked' : '';
-        printf('                    <option value="%s"%s>%s</option>', $key, $checked, $value);
-        endforeach;
+            printf('                <label for="scraper_handle">%s</label>', __('Podcast-site', 'podcast-scraper'));
+            echo '                <select name="scraper_handle" id="scraper_handle">';
 
-        echo '                </select>';
+            $options = podcast_scraper_get_scrapers();
+            foreach ($options as $key => $value):
+            $selected = $key == $show->scraper_handle ? ' selected' : '';
+            printf('                    <option value="%s"%s>%s</option>', $key, $selected, $value);
+            endforeach;
 
-        echo '<br/>';
+            echo '                </select>';
 
-        echo '                <label for="max_episodes">';
-        $checked = $show->max_episodes ? ' checked' : '';
-        printf('                <input name="limit_episodes" id="limit_episodes" type="checkbox"%s />', $checked);
-        echo __('Beperk te synchroniseren afleveringen tot: ', 'podcast-scraper');
-        printf('                <input name="max_episodes" id="max_episodes" type="number" value="%d" class="small-text" /></label>', $show->max_episodes);
+            echo '<br/>';
 
-        echo '<br/>';
+            echo '                <label for="max_episodes">';
+            $checked = $show->max_episodes ? ' checked' : '';
+            printf('                <input name="limit_episodes" id="limit_episodes" type="checkbox"%s />', $checked);
+            echo __('Beperk te synchroniseren afleveringen tot: ', 'podcast-scraper');
+            printf('                <input name="max_episodes" id="max_episodes" type="number" value="%d" min="0" class="small-text" /></label>', $show->max_episodes);
 
-        printf('                <label for="num_episodes">%s</label>', __('Aantal te synchroniseren afleveringen per sessie', 'podcast-scraper'));
-        printf('                <input name="num_episodes" id="num_episodes" type="number" value="%d" class="small-text" />', $show->num_episodes);
+            echo '<br/>';
 
-        submit_button(__('Opslaan', 'podcast-scraper'));
+            printf('                <label for="num_episodes">%s</label>', __('Aantal te synchroniseren afleveringen per sessie', 'podcast-scraper'));
+            printf('                <input name="num_episodes" id="num_episodes" type="number" required min="1" value="%d" class="small-text" />', $show->num_episodes);
 
-        echo '            </form>';
-        echo '        </div>';
-        echo '    </div>';
-        echo '</div>';
+            submit_button(__('Opslaan', 'podcast-scraper'));
+
+            echo '            </form>';
+            echo '        </div>';
+            echo '    </div>';
+            echo '</div>';
+        }
 
     }
 
@@ -228,7 +258,9 @@ class ShowManagerFactory {
 
     public static function add_admin_menu() {
 
-        $show_manager = new ShowManager();
+        $show_manager = new ShowManager(
+            new WP_Referer(), new WP_Redirect()
+        );
 
     }
 

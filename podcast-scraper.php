@@ -23,6 +23,8 @@ if (!class_exists('DOMEvent')) {
     require('ext/phpQuery.php');
 }
 
+require('wp/wp_redirect.php');
+require('wp/wp_referer.php');
 require('wp/wp_remote.php');
 require('includes/functions.php');
 require('includes/feed-generator.php');
